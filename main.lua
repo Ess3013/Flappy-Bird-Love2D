@@ -154,18 +154,23 @@ function love.draw()
         end
     end
 
-    -- Draw Pipes
-    for _, p in ipairs(pipes) do
-        love.graphics.setColor(0.2, 0.8, 0.2) -- Green
-        -- Top Pipe
-        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
-        -- Bottom Pipe
-        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
-        
-        -- Black Borders
-        love.graphics.setColor(0, 0, 0)
-        love.graphics.setLineWidth(3)
-        love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
-        love.graphics.rectangle("line", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
-    end
+    -- Draw Bird
+    love.graphics.setColor(1, 1, 1)
+    local sprite = bird.sprites[bird.currentFrame]
+    local bScaleX = (bird.radius * 2) / sprite:getWidth()
+    local bScaleY = (bird.radius * 2) / sprite:getHeight()
+    love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
 
+    -- UI
+    if gameState == states.START then
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.printf("Press SPACE to Start", 0, love.graphics.getHeight()/2 - 10, love.graphics.getWidth(), "center")
+    elseif gameState == states.GAMEOVER then
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 30, love.graphics.getWidth(), "center")
+    else
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.setFont(love.graphics.newFont(24))
+        love.graphics.print("Score: " .. score, 20, 20)
+    end
+end
