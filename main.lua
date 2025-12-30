@@ -13,8 +13,9 @@ local bird = {
     sprites = {},
     currentFrame = 1,
     animTimer = 0,
-    animSpeed = 0.1,
-    isAnimating = false
+    animSpeed = 0.05, -- Faster flap
+    isAnimating = false,
+    angle = 0 -- Rotation angle
 }
 
 -- Pipe Properties
@@ -42,6 +43,7 @@ function resetGame()
     bird.currentFrame = 1
     bird.animTimer = 0
     bird.isAnimating = false
+    bird.angle = 0
     pipes = {}
     spawnTimer = 0
     score = 0
@@ -66,16 +68,16 @@ function love.update(dt)
         bird.velocity = bird.velocity + bird.gravity * dt
         bird.y = bird.y + bird.velocity * dt
 
-        -- Animation Logic
-        if bird.isAnimating then
-            bird.animTimer = bird.animTimer + dt
-            if bird.animTimer >= bird.animSpeed then
-                bird.animTimer = 0
-                bird.currentFrame = bird.currentFrame + 1
-                if bird.currentFrame > #bird.sprites then
-                    bird.currentFrame = 1
-                    bird.isAnimating = false -- Stop animating after one cycle
-                end
+        -- Rotation logic: Map velocity to angle (-45 to 90 degrees)
+        bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.velocity * 0.002))
+
+        -- Animation Logic (Always flapping when playing)
+        bird.animTimer = bird.animTimer + dt
+        if bird.animTimer >= bird.animSpeed then
+            bird.animTimer = 0
+            bird.currentFrame = bird.currentFrame + 1
+            if bird.currentFrame > #bird.sprites then
+                bird.currentFrame = 1
             end
         end
 
@@ -157,8 +159,8 @@ function love.draw()
     local scaleX = (bird.radius * 2) / sprite:getWidth()
     local scaleY = (bird.radius * 2) / sprite:getHeight()
     
-    -- Draw centered at bird.x, bird.y
-    love.graphics.draw(sprite, bird.x, bird.y, 0, scaleX, scaleY, sprite:getWidth()/2, sprite:getHeight()/2)
+    -- Draw centered at bird.x, bird.y with rotation
+    love.graphics.draw(sprite, bird.x, bird.y, bird.angle, scaleX, scaleY, sprite:getWidth()/2, sprite:getHeight()/2)
 
     -- UI
     love.graphics.setColor(1, 1, 1)
