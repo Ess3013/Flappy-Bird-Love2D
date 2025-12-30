@@ -35,8 +35,6 @@ function love.load()
     for i = 1, 5 do
         bird.sprites[i] = love.graphics.newImage("Sprites/Bird/frame-" .. i .. ".png")
     end
-    -- Load Pipe Sprite
-    pipeImage = love.graphics.newImage("Sprites/pipe.png")
     resetGame()
 end
 
@@ -143,37 +141,31 @@ function love.keypressed(key)
 end
 
 function love.draw()
-    love.graphics.clear(0.4, 0.6, 0.9)
+    -- Draw Checkerboard Background
+    local cellSize = 40
+    for y = 0, love.graphics.getHeight(), cellSize do
+        for x = 0, love.graphics.getWidth(), cellSize do
+            if (x / cellSize + y / cellSize) % 2 == 0 then
+                love.graphics.setColor(0.96, 0.96, 0.86) -- Beige 1
+            else
+                love.graphics.setColor(0.93, 0.91, 0.82) -- Beige 2
+            end
+            love.graphics.rectangle("fill", x, y, cellSize, cellSize)
+        end
+    end
 
-    -- Draw Pipes with uniform scaling
-    love.graphics.setColor(1, 1, 1)
-    local scale = pipeWidth / pipeImage:getWidth()
-    
+    -- Draw Pipes
     for _, p in ipairs(pipes) do
-        -- Top Pipe: Draw it at p.top and flip it upwards. 
-        -- We draw it "bottom-up" from the gap edge.
-        love.graphics.draw(pipeImage, p.x, p.top, 0, scale, -scale, 0, 0)
-        -- Since the sprite might not be long enough, we can draw another one above it if needed, 
-        -- but with landscape and decent sprite length it usually works. 
-        -- To be safe, we'd need a loop or a very long sprite.
+        love.graphics.setColor(0.2, 0.8, 0.2) -- Green
+        -- Top Pipe
+        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
+        -- Bottom Pipe
+        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
         
-        -- Bottom Pipe: Draw it at p.top + pipeGap
-        love.graphics.draw(pipeImage, p.x, p.top + pipeGap, 0, scale, scale, 0, 0)
+        -- Black Borders
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
+        love.graphics.rectangle("line", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
     end
 
-    -- Draw Bird
-    local sprite = bird.sprites[bird.currentFrame]
-    local bScaleX = (bird.radius * 2) / sprite:getWidth()
-    local bScaleY = (bird.radius * 2) / sprite:getHeight()
-    love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
-
-    -- UI
-    if gameState == states.START then
-        love.graphics.printf("Press SPACE to Start", 0, love.graphics.getHeight()/2 - 10, love.graphics.getWidth(), "center")
-    elseif gameState == states.GAMEOVER then
-        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 30, love.graphics.getWidth(), "center")
-    else
-        love.graphics.setFont(love.graphics.newFont(24))
-        love.graphics.print("Score: " .. score, 20, 20)
-    end
-end
