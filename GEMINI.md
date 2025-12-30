@@ -46,3 +46,8 @@ love .
 5.  Create `Pipe` generation and movement logic.
 6.  Implement collision detection.
 7.  Add Game Over state and Scoring.
+
+## Gemini Added Memories
+- Commit every change made to the codebase to the git repository.
+- Run the game (`love .`) after edits and commits to verify changes.
+
