@@ -71,14 +71,19 @@ function love.update(dt)
         -- Rotation logic: Map velocity to angle (-45 to 90 degrees)
         bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.velocity * 0.002))
 
-        -- Animation Logic (Always flapping when playing)
-        bird.animTimer = bird.animTimer + dt
-        if bird.animTimer >= bird.animSpeed then
-            bird.animTimer = 0
-            bird.currentFrame = bird.currentFrame + 1
-            if bird.currentFrame > #bird.sprites then
-                bird.currentFrame = 1
+        -- Animation Logic (Flap only on jump)
+        if bird.isAnimating then
+            bird.animTimer = bird.animTimer + dt
+            if bird.animTimer >= bird.animSpeed then
+                bird.animTimer = 0
+                bird.currentFrame = bird.currentFrame + 1
+                if bird.currentFrame > #bird.sprites then
+                    bird.currentFrame = 1
+                    bird.isAnimating = false -- Stop after one flap cycle
+                end
             end
+        else
+            bird.currentFrame = 1 -- Default frame when not flapping
         end
 
         -- Ground/Ceiling Collision
