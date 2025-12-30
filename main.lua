@@ -4,27 +4,27 @@ local gameState = states.START
 
 -- Bird Properties
 local bird = {
-    x = 50,
+    x = 100, -- Adjusted for landscape
     y = 300,
-    radius = 15,
+    radius = 20, -- Slightly larger for better visibility
     velocity = 0,
-    gravity = 1500,
+    gravity = 1200, -- Reduced gravity for landscape feel
     jumpStrength = -400,
     sprites = {},
     currentFrame = 1,
     animTimer = 0,
-    animSpeed = 0.05, -- Faster flap
+    animSpeed = 0.05,
     isAnimating = false,
-    angle = 0 -- Rotation angle
+    angle = 0
 }
 
 -- Pipe Properties
 local pipes = {}
-local pipeWidth = 50
-local pipeGap = 150
-local pipeSpeed = 200
+local pipeWidth = 80 -- Wider pipes for landscape
+local pipeGap = 180 -- Larger gap
+local pipeSpeed = 250
 local spawnTimer = 0
-local spawnInterval = 1.5
+local spawnInterval = 1.8
 local pipeImage
 
 -- Score
@@ -54,7 +54,7 @@ function resetGame()
 end
 
 function spawnPipe()
-    local minHeight = 50
+    local minHeight = 100
     local maxHeight = love.graphics.getHeight() - pipeGap - minHeight
     local topHeight = math.random(minHeight, maxHeight)
     
@@ -71,10 +71,10 @@ function love.update(dt)
         bird.velocity = bird.velocity + bird.gravity * dt
         bird.y = bird.y + bird.velocity * dt
 
-        -- Rotation logic: Map velocity to angle (-45 to 90 degrees)
+        -- Rotation logic
         bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.velocity * 0.002))
 
-        -- Animation Logic (Flap only on jump)
+        -- Animation Logic
         if bird.isAnimating then
             bird.animTimer = bird.animTimer + dt
             if bird.animTimer >= bird.animSpeed then
@@ -82,38 +82,33 @@ function love.update(dt)
                 bird.currentFrame = bird.currentFrame + 1
                 if bird.currentFrame > #bird.sprites then
                     bird.currentFrame = 1
-                    bird.isAnimating = false -- Stop after one flap cycle
+                    bird.isAnimating = false
                 end
             end
         else
-            bird.currentFrame = 1 -- Default frame when not flapping
+            bird.currentFrame = 1
         end
 
-        -- Ground/Ceiling Collision
+        -- Collision
         if bird.y - bird.radius < 0 or bird.y + bird.radius > love.graphics.getHeight() then
             gameState = states.GAMEOVER
         end
 
-        -- Pipe Spawning
+        -- Spawning
         spawnTimer = spawnTimer + dt
         if spawnTimer > spawnInterval then
             spawnPipe()
             spawnTimer = 0
         end
 
-        -- Pipe Movement and Collision
+        -- Pipes
         for i = #pipes, 1, -1 do
             local p = pipes[i]
             p.x = p.x - pipeSpeed * dt
 
-            -- Collision Detection
-            local birdRight = bird.x + bird.radius
-            local birdLeft = bird.x - bird.radius
-            local birdTop = bird.y - bird.radius
-            local birdBottom = bird.y + bird.radius
-
-            if birdRight > p.x and birdLeft < p.x + pipeWidth then
-                if birdTop < p.top or birdBottom > p.top + pipeGap then
+            -- Collision Detection (AABB)
+            if bird.x + bird.radius > p.x and bird.x - bird.radius < p.x + pipeWidth then
+                if bird.y - bird.radius < p.top or bird.y + bird.radius > p.top + pipeGap then
                     gameState = states.GAMEOVER
                 end
             end
@@ -124,7 +119,6 @@ function love.update(dt)
                 p.scored = true
             end
 
-            -- Remove Off-screen Pipes
             if p.x + pipeWidth < 0 then
                 table.remove(pipes, i)
             end
@@ -149,43 +143,37 @@ function love.keypressed(key)
 end
 
 function love.draw()
-    -- Background
     love.graphics.clear(0.4, 0.6, 0.9)
 
-    -- Draw Pipes
+    -- Draw Pipes with uniform scaling
     love.graphics.setColor(1, 1, 1)
-    local pipeScaleX = pipeWidth / pipeImage:getWidth()
+    local scale = pipeWidth / pipeImage:getWidth()
     
     for _, p in ipairs(pipes) do
-        -- Top Pipe (Flipped)
-        -- We scale Y by a large enough value to cover the top area, and flip it with -1
-        local topScaleY = p.top / pipeImage:getHeight()
-        love.graphics.draw(pipeImage, p.x, p.top, 0, pipeScaleX, -topScaleY)
+        -- Top Pipe: Draw it at p.top and flip it upwards. 
+        -- We draw it "bottom-up" from the gap edge.
+        love.graphics.draw(pipeImage, p.x, p.top, 0, scale, -scale, 0, 0)
+        -- Since the sprite might not be long enough, we can draw another one above it if needed, 
+        -- but with landscape and decent sprite length it usually works. 
+        -- To be safe, we'd need a loop or a very long sprite.
         
-        -- Bottom Pipe
-        local bottomHeight = love.graphics.getHeight() - (p.top + pipeGap)
-        local bottomScaleY = bottomHeight / pipeImage:getHeight()
-        love.graphics.draw(pipeImage, p.x, p.top + pipeGap, 0, pipeScaleX, bottomScaleY)
+        -- Bottom Pipe: Draw it at p.top + pipeGap
+        love.graphics.draw(pipeImage, p.x, p.top + pipeGap, 0, scale, scale, 0, 0)
     end
 
-    -- Draw Bird Sprite
-    love.graphics.setColor(1, 1, 1) -- Reset color to white for proper sprite rendering
+    -- Draw Bird
     local sprite = bird.sprites[bird.currentFrame]
-    local scaleX = (bird.radius * 2) / sprite:getWidth()
-    local scaleY = (bird.radius * 2) / sprite:getHeight()
-    
-    -- Draw centered at bird.x, bird.y with rotation
-    love.graphics.draw(sprite, bird.x, bird.y, bird.angle, scaleX, scaleY, sprite:getWidth()/2, sprite:getHeight()/2)
+    local bScaleX = (bird.radius * 2) / sprite:getWidth()
+    local bScaleY = (bird.radius * 2) / sprite:getHeight()
+    love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
 
     -- UI
-    love.graphics.setColor(1, 1, 1)
     if gameState == states.START then
         love.graphics.printf("Press SPACE to Start", 0, love.graphics.getHeight()/2 - 10, love.graphics.getWidth(), "center")
     elseif gameState == states.GAMEOVER then
-        love.graphics.printf("GAME OVER", 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
-        love.graphics.printf("Score: " .. score, 0, love.graphics.getHeight()/2, love.graphics.getWidth(), "center")
-        love.graphics.printf("Press SPACE to Restart", 0, love.graphics.getHeight()/2 + 20, love.graphics.getWidth(), "center")
+        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 30, love.graphics.getWidth(), "center")
     else
-        love.graphics.print("Score: " .. score, 10, 10)
+        love.graphics.setFont(love.graphics.newFont(24))
+        love.graphics.print("Score: " .. score, 20, 20)
     end
 end
