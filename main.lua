@@ -154,6 +154,21 @@ function love.draw()
         end
     end
 
+    -- Draw Pipes
+    for _, p in ipairs(pipes) do
+        love.graphics.setColor(0.2, 0.8, 0.2) -- Green
+        -- Top Pipe
+        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
+        -- Bottom Pipe
+        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
+        
+        -- Black Borders
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
+        love.graphics.rectangle("line", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
+    end
+
     -- Draw Bird
     love.graphics.setColor(1, 1, 1)
     local sprite = bird.sprites[bird.currentFrame]
