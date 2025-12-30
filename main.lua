@@ -40,17 +40,23 @@ local score = 0
 local highscore = 0
 local highscoreFile = "highscore.txt"
 
--- Loads the highscore from the save directory if it exists
+-- Loads the highscore from the local file
 function loadHighscore()
-    if love.filesystem.getInfo(highscoreFile) then
-        local content = love.filesystem.read(highscoreFile)
+    local f = io.open(highscoreFile, "r")
+    if f then
+        local content = f:read("*all")
         highscore = tonumber(content) or 0
+        f:close()
     end
 end
 
--- Saves the current highscore to the save directory
+-- Saves the current highscore to the local file
 function saveHighscore()
-    love.filesystem.write(highscoreFile, tostring(highscore))
+    local f = io.open(highscoreFile, "w")
+    if f then
+        f:write(tostring(highscore))
+        f:close()
+    end
 end
 
 function love.load()
