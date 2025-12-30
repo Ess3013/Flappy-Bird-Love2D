@@ -36,6 +36,7 @@ love .
 ### Conventions
 *   **Naming:** PascalCase for classes/files (e.g., `Bird.lua`), camelCase for variables and functions.
 *   **Class System:** Use a Lua class library (like `classic` or a simple closure-based approach) for entity management.
+*   **Version Control:** Make a Git commit for every change or feature implemented in the game.
 
 ## Roadmap
 1.  Initialize `main.lua` and `conf.lua`.
