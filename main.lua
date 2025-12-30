@@ -9,7 +9,12 @@ local bird = {
     radius = 15,
     velocity = 0,
     gravity = 1500,
-    jumpStrength = -400
+    jumpStrength = -400,
+    sprites = {},
+    currentFrame = 1,
+    animTimer = 0,
+    animSpeed = 0.1,
+    isAnimating = false
 }
 
 -- Pipe Properties
@@ -24,12 +29,19 @@ local spawnInterval = 1.5
 local score = 0
 
 function love.load()
+    -- Load Bird Sprites
+    for i = 1, 5 do
+        bird.sprites[i] = love.graphics.newImage("Sprites/Bird/frame-" .. i .. ".png")
+    end
     resetGame()
 end
 
 function resetGame()
     bird.y = 300
     bird.velocity = 0
+    bird.currentFrame = 1
+    bird.animTimer = 0
+    bird.isAnimating = false
     pipes = {}
     spawnTimer = 0
     score = 0
@@ -54,6 +66,19 @@ function love.update(dt)
         bird.velocity = bird.velocity + bird.gravity * dt
         bird.y = bird.y + bird.velocity * dt
 
+        -- Animation Logic
+        if bird.isAnimating then
+            bird.animTimer = bird.animTimer + dt
+            if bird.animTimer >= bird.animSpeed then
+                bird.animTimer = 0
+                bird.currentFrame = bird.currentFrame + 1
+                if bird.currentFrame > #bird.sprites then
+                    bird.currentFrame = 1
+                    bird.isAnimating = false -- Stop animating after one cycle
+                end
+            end
+        end
+
         -- Ground/Ceiling Collision
         if bird.y - bird.radius < 0 or bird.y + bird.radius > love.graphics.getHeight() then
             gameState = states.GAMEOVER
@@ -71,7 +96,7 @@ function love.update(dt)
             local p = pipes[i]
             p.x = p.x - pipeSpeed * dt
 
-            -- Collision Detection (AABB-ish for circle vs rectangle)
+            -- Collision Detection
             local birdRight = bird.x + bird.radius
             local birdLeft = bird.x - bird.radius
             local birdTop = bird.y - bird.radius
@@ -101,8 +126,12 @@ function love.keypressed(key)
     if key == "space" then
         if gameState == states.START then
             gameState = states.PLAYING
+            bird.isAnimating = true
         elseif gameState == states.PLAYING then
             bird.velocity = bird.jumpStrength
+            bird.isAnimating = true
+            bird.currentFrame = 1
+            bird.animTimer = 0
         elseif gameState == states.GAMEOVER then
             resetGame()
         end
@@ -122,9 +151,14 @@ function love.draw()
         love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
     end
 
-    -- Draw Bird
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.circle("fill", bird.x, bird.y, bird.radius)
+    -- Draw Bird Sprite
+    love.graphics.setColor(1, 1, 1) -- Reset color to white for proper sprite rendering
+    local sprite = bird.sprites[bird.currentFrame]
+    local scaleX = (bird.radius * 2) / sprite:getWidth()
+    local scaleY = (bird.radius * 2) / sprite:getHeight()
+    
+    -- Draw centered at bird.x, bird.y
+    love.graphics.draw(sprite, bird.x, bird.y, 0, scaleX, scaleY, sprite:getWidth()/2, sprite:getHeight()/2)
 
     -- UI
     love.graphics.setColor(1, 1, 1)
