@@ -4,11 +4,11 @@ local gameState = states.START
 
 -- Bird Properties
 local bird = {
-    x = 100, -- Adjusted for landscape
+    x = 100,
     y = 300,
-    radius = 20, -- Slightly larger for better visibility
+    radius = 20,
     velocity = 0,
-    gravity = 1200, -- Reduced gravity for landscape feel
+    gravity = 1200,
     jumpStrength = -400,
     sprites = {},
     currentFrame = 1,
@@ -20,21 +20,34 @@ local bird = {
 
 -- Pipe Properties
 local pipes = {}
-local pipeWidth = 80 -- Wider pipes for landscape
-local pipeGap = 180 -- Larger gap
+local pipeWidth = 80
+local pipeGap = 180
 local pipeSpeed = 250
 local spawnTimer = 0
 local spawnInterval = 1.8
-local pipeImage
 
 -- Score
 local score = 0
+local highscore = 0
+local highscoreFile = "highscore.txt"
+
+function loadHighscore()
+    if love.filesystem.getInfo(highscoreFile) then
+        local content = love.filesystem.read(highscoreFile)
+        highscore = tonumber(content) or 0
+    end
+end
+
+function saveHighscore()
+    love.filesystem.write(highscoreFile, tostring(highscore))
+end
 
 function love.load()
     -- Load Bird Sprites
     for i = 1, 5 do
         bird.sprites[i] = love.graphics.newImage("Sprites/Bird/frame-" .. i .. ".png")
     end
+    loadHighscore()
     resetGame()
 end
 
@@ -63,6 +76,14 @@ function spawnPipe()
     })
 end
 
+function gameOver()
+    gameState = states.GAMEOVER
+    if score > highscore then
+        highscore = score
+        saveHighscore()
+    end
+end
+
 function love.update(dt)
     if gameState == states.PLAYING then
         -- Bird Physics
@@ -87,9 +108,9 @@ function love.update(dt)
             bird.currentFrame = 1
         end
 
-        -- Collision
+        -- Collision (Floor/Ceiling)
         if bird.y - bird.radius < 0 or bird.y + bird.radius > love.graphics.getHeight() then
-            gameState = states.GAMEOVER
+            gameOver()
         end
 
         -- Spawning
@@ -107,7 +128,7 @@ function love.update(dt)
             -- Collision Detection (AABB)
             if bird.x + bird.radius > p.x and bird.x - bird.radius < p.x + pipeWidth then
                 if bird.y - bird.radius < p.top or bird.y + bird.radius > p.top + pipeGap then
-                    gameState = states.GAMEOVER
+                    gameOver()
                 end
             end
 
@@ -115,6 +136,10 @@ function love.update(dt)
             if not p.scored and p.x + pipeWidth < bird.x then
                 score = score + 1
                 p.scored = true
+                -- Optional: update highscore live if exceeded
+                if score > highscore then
+                    highscore = score
+                end
             end
 
             if p.x + pipeWidth < 0 then
@@ -157,12 +182,9 @@ function love.draw()
     -- Draw Pipes
     for _, p in ipairs(pipes) do
         love.graphics.setColor(0.2, 0.8, 0.2) -- Green
-        -- Top Pipe
         love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
-        -- Bottom Pipe
         love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
         
-        -- Black Borders
         love.graphics.setColor(0, 0, 0)
         love.graphics.setLineWidth(3)
         love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
@@ -177,15 +199,14 @@ function love.draw()
     love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
 
     -- UI
+    love.graphics.setColor(0, 0, 0)
     if gameState == states.START then
-        love.graphics.setColor(0, 0, 0)
-        love.graphics.printf("Press SPACE to Start", 0, love.graphics.getHeight()/2 - 10, love.graphics.getWidth(), "center")
+        love.graphics.printf("Press SPACE to Start\nHighscore: " .. highscore, 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
     elseif gameState == states.GAMEOVER then
-        love.graphics.setColor(0, 0, 0)
-        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 30, love.graphics.getWidth(), "center")
+        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nHighscore: " .. highscore .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 40, love.graphics.getWidth(), "center")
     else
-        love.graphics.setColor(0, 0, 0)
         love.graphics.setFont(love.graphics.newFont(24))
         love.graphics.print("Score: " .. score, 20, 20)
+        love.graphics.print("Best: " .. highscore, 20, 50)
     end
 end
