@@ -26,26 +26,24 @@ local pipeSpeed = 250
 local spawnTimer = 0
 local spawnInterval = 1.8
 
+-- Background
+local backgroundScroll = 0
+local backgroundSpeed = 30 -- Parallax speed (slower than pipes)
+
 -- Score
 local score = 0
 local highscore = 0
 local highscoreFile = "highscore.txt"
 
 function loadHighscore()
-    local f = io.open(highscoreFile, "r")
-    if f then
-        local content = f:read("*all")
+    if love.filesystem.getInfo(highscoreFile) then
+        local content = love.filesystem.read(highscoreFile)
         highscore = tonumber(content) or 0
-        f:close()
     end
 end
 
 function saveHighscore()
-    local f = io.open(highscoreFile, "w")
-    if f then
-        f:write(tostring(highscore))
-        f:close()
-    end
+    love.filesystem.write(highscoreFile, tostring(highscore))
 end
 
 function love.load()
@@ -91,6 +89,9 @@ function gameOver()
 end
 
 function love.update(dt)
+    -- Scroll background
+    backgroundScroll = (backgroundScroll + backgroundSpeed * dt) % 80 -- Modulo 80 (2 * cellSize) to keep numbers small
+
     if gameState == states.PLAYING then
         -- Bird Physics
         bird.velocity = bird.velocity + bird.gravity * dt
@@ -156,6 +157,10 @@ function love.update(dt)
 end
 
 function love.keypressed(key)
+    if key == "escape" then
+        love.event.quit()
+    end
+
     if key == "space" then
         if gameState == states.START then
             gameState = states.PLAYING
@@ -174,14 +179,20 @@ end
 function love.draw()
     -- Draw Checkerboard Background
     local cellSize = 40
+    -- We draw a bit wider than the screen to handle the scrolling shift
     for y = 0, love.graphics.getHeight(), cellSize do
-        for x = 0, love.graphics.getWidth(), cellSize do
-            if (x / cellSize + y / cellSize) % 2 == 0 then
+        for x = -cellSize * 2, love.graphics.getWidth() + cellSize, cellSize do
+            -- Determine color based on the logical grid position
+            if (math.floor(x / cellSize) + math.floor(y / cellSize)) % 2 == 0 then
                 love.graphics.setColor(0.96, 0.96, 0.86) -- Beige 1
             else
                 love.graphics.setColor(0.93, 0.91, 0.82) -- Beige 2
             end
-            love.graphics.rectangle("fill", x, y, cellSize, cellSize)
+            
+            -- Draw at the scrolled position
+            -- We subtract backgroundScroll to move left
+            -- backgroundScroll is already modulo'd in update, but we rely on the loop's 'x' being aligned to grid
+            love.graphics.rectangle("fill", x - backgroundScroll, y, cellSize, cellSize)
         end
     end
 
