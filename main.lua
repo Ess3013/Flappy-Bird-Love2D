@@ -32,14 +32,20 @@ local highscore = 0
 local highscoreFile = "highscore.txt"
 
 function loadHighscore()
-    if love.filesystem.getInfo(highscoreFile) then
-        local content = love.filesystem.read(highscoreFile)
+    local f = io.open(highscoreFile, "r")
+    if f then
+        local content = f:read("*all")
         highscore = tonumber(content) or 0
+        f:close()
     end
 end
 
 function saveHighscore()
-    love.filesystem.write(highscoreFile, tostring(highscore))
+    local f = io.open(highscoreFile, "w")
+    if f then
+        f:write(tostring(highscore))
+        f:close()
+    end
 end
 
 function love.load()
