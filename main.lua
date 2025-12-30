@@ -56,6 +56,9 @@ function saveHighscore()
     if f then
         f:write(tostring(highscore))
         f:close()
+        print("Saved highscore: " .. highscore)
+    else
+        print("Error: Could not save highscore to " .. highscoreFile)
     end
 end
 
@@ -98,7 +101,7 @@ end
 -- Handles game over logic and highscore updating
 function gameOver()
     gameState = states.GAMEOVER
-    if score > highscore then
+    if score >= highscore then
         highscore = score
         saveHighscore()
     end

@@ -5,4 +5,5 @@ function love.conf(t)
     t.window.height = 600
     t.window.resizable = false
     t.modules.physics = false
+    t.console = true -- Enable console for debugging
 end
