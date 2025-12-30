@@ -25,6 +25,7 @@ local pipeGap = 150
 local pipeSpeed = 200
 local spawnTimer = 0
 local spawnInterval = 1.5
+local pipeImage
 
 -- Score
 local score = 0
@@ -34,6 +35,8 @@ function love.load()
     for i = 1, 5 do
         bird.sprites[i] = love.graphics.newImage("Sprites/Bird/frame-" .. i .. ".png")
     end
+    -- Load Pipe Sprite
+    pipeImage = love.graphics.newImage("Sprites/pipe.png")
     resetGame()
 end
 
@@ -150,12 +153,19 @@ function love.draw()
     love.graphics.clear(0.4, 0.6, 0.9)
 
     -- Draw Pipes
-    love.graphics.setColor(0.2, 0.8, 0.2)
+    love.graphics.setColor(1, 1, 1)
+    local pipeScaleX = pipeWidth / pipeImage:getWidth()
+    
     for _, p in ipairs(pipes) do
-        -- Top Pipe
-        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
+        -- Top Pipe (Flipped)
+        -- We scale Y by a large enough value to cover the top area, and flip it with -1
+        local topScaleY = p.top / pipeImage:getHeight()
+        love.graphics.draw(pipeImage, p.x, p.top, 0, pipeScaleX, -topScaleY)
+        
         -- Bottom Pipe
-        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
+        local bottomHeight = love.graphics.getHeight() - (p.top + pipeGap)
+        local bottomScaleY = bottomHeight / pipeImage:getHeight()
+        love.graphics.draw(pipeImage, p.x, p.top + pipeGap, 0, pipeScaleX, bottomScaleY)
     end
 
     -- Draw Bird Sprite
