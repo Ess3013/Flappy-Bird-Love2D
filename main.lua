@@ -17,7 +17,8 @@ local bird = {
     animTimer = 0,
     animSpeed = 0.05,    -- Time between frames
     isAnimating = false,
-    angle = 0            -- Rotation based on velocity
+    angle = 0,            -- Rotation based on velocity
+    jumpCount = 0         -- Track jumps between pipes
 }
 
 -- Pipe Properties
@@ -79,6 +80,7 @@ function resetGame()
     bird.animTimer = 0
     bird.isAnimating = false
     bird.angle = 0
+    bird.jumpCount = 0
     pipes = {}
     spawnTimer = 0
     score = 0
@@ -162,8 +164,17 @@ function love.update(dt)
 
             -- Scoring: Increment score when passing a pipe
             if not p.scored and p.x + pipeWidth < bird.x then
-                score = score + 1
+                local points = 1
+                if bird.jumpCount == 1 then
+                    points = 3
+                elseif bird.jumpCount == 2 then
+                    points = 2
+                end
+                
+                score = score + points
                 p.scored = true
+                bird.jumpCount = 0 -- Reset jump count for next pipe
+                
                 -- Update highscore live for player feedback
                 if score > highscore then
                     highscore = score
@@ -194,6 +205,7 @@ function love.keypressed(key)
             bird.isAnimating = true
             bird.currentFrame = 1
             bird.animTimer = 0
+            bird.jumpCount = bird.jumpCount + 1
         elseif gameState == states.GAMEOVER then
             resetGame()
         end
