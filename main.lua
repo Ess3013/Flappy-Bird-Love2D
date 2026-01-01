@@ -41,6 +41,9 @@ local score = 0
 local highscore = 0
 local highscoreFile = "highscore.txt"
 
+-- Audio
+local sounds = {}
+
 -- Loads the highscore from the local file
 function loadHighscore()
     local f = io.open(highscoreFile, "r")
@@ -68,6 +71,15 @@ function love.load()
     for i = 1, 5 do
         bird.sprites[i] = love.graphics.newImage("Sprites/Bird/frame-" .. i .. ".png")
     end
+
+    -- Load Audio
+    sounds.jump = love.audio.newSource("Audio/sfx_movement_ladder1b.wav", "static")
+    sounds.score = love.audio.newSource("Audio/sfx_sounds_powerup6.wav", "static")
+    sounds.music = love.audio.newSource("Audio/BGM.wav", "stream")
+    
+    sounds.music:setLooping(true)
+    sounds.music:play()
+
     loadHighscore()
     resetGame()
 end
@@ -174,6 +186,8 @@ function love.update(dt)
                 score = score + points
                 p.scored = true
                 bird.jumpCount = 0 -- Reset jump count for next pipe
+                sounds.score:stop()
+                sounds.score:play()
                 
                 -- Update highscore live for player feedback
                 if score > highscore then
@@ -199,6 +213,9 @@ function love.keypressed(key)
         if gameState == states.START then
             gameState = states.PLAYING
             bird.isAnimating = true
+            bird.jumpCount = 1
+            bird.velocity = bird.jumpStrength
+            sounds.jump:play()
         elseif gameState == states.PLAYING then
             -- Jump action
             bird.velocity = bird.jumpStrength
@@ -206,6 +223,8 @@ function love.keypressed(key)
             bird.currentFrame = 1
             bird.animTimer = 0
             bird.jumpCount = bird.jumpCount + 1
+            sounds.jump:stop()
+            sounds.jump:play()
         elseif gameState == states.GAMEOVER then
             resetGame()
         end
