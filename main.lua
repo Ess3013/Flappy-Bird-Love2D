@@ -362,9 +362,9 @@ function love.draw()
 
     -- Draw Slingshot Visualization
     if aiming.active then
-        -- Calculate clamped end point
-        local dx = aiming.currentX - aiming.startX
-        local dy = aiming.currentY - aiming.startY
+        -- Calculate clamped vector (same as in mousereleased)
+        local dx = aiming.startX - aiming.currentX
+        local dy = aiming.startY - aiming.currentY
         local len = math.sqrt(dx*dx + dy*dy)
         if len > aiming.maxPull then
             local scale = aiming.maxPull / len
@@ -372,20 +372,49 @@ function love.draw()
             dy = dy * scale
         end
         
-        -- Draw line from Bird in the direction of the launch (Opposite to drag)
-        -- Visual 1: Draw the "String" being pulled
-        love.graphics.setColor(0, 0, 0, 0.5)
-        love.graphics.setLineWidth(4)
-        love.graphics.line(bird.x, bird.y, bird.x + dx, bird.y + dy)
-        
-        -- Visual 2: Draw the projected launch direction (optional, but helpful)
-        love.graphics.setColor(1, 0, 0, 0.5)
+        -- Draw the "String" (visual feedback for pull)
+        love.graphics.setColor(0, 0, 0, 0.3)
         love.graphics.setLineWidth(2)
         love.graphics.line(bird.x, bird.y, bird.x - dx, bird.y - dy)
+        love.graphics.circle("fill", bird.x - dx, bird.y - dy, 5)
+
+        -- Trajectory Prediction
+        love.graphics.setColor(1, 0, 0, 0.6)
         
-        -- Draw circle at end of pull
-        love.graphics.setColor(0, 0, 0, 0.5)
-        love.graphics.circle("fill", bird.x + dx, bird.y + dy, 10)
+        -- Simulation variables
+        local simX = bird.x
+        local simY = bird.y
+        -- Bird Y velocity resets on launch
+        local simVy = dy * aiming.powerMultiplier 
+        -- World Speed is additive
+        local simWorldSpeed = worldSpeed + (dx * aiming.powerMultiplier)
+        
+        local simDt = 1/60 -- Fixed timestep for prediction
+        local drag = 0.8   -- Match the physics constant
+        local gravity = bird.gravity
+        
+        -- Draw trajectory points
+        for i = 1, 90 do -- Simulate 1.5 seconds
+            -- Update Physics (Euler integration matching update loop)
+            simVy = simVy + gravity * simDt
+            simY = simY + simVy * simDt
+            
+            simWorldSpeed = simWorldSpeed - (simWorldSpeed * drag * simDt)
+            if math.abs(simWorldSpeed) < 1 then simWorldSpeed = 0 end
+            
+            -- Move X relative to the world
+            simX = simX + simWorldSpeed * simDt
+            
+            -- Draw point
+            if i % 3 == 0 then -- Draw every 3rd point for dotted effect
+                love.graphics.circle("fill", simX, simY, 3)
+            end
+            
+            -- Stop if off screen
+            if simY > love.graphics.getHeight() or simY < 0 or simX > love.graphics.getWidth() then
+                break
+            end
+        end
     end
 
     -- Draw Floating Texts
