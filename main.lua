@@ -9,8 +9,7 @@ local bird = {
     x = 100,
     y = 300,
     radius = 20,
-    vx = 0,              -- Velocity X
-    vy = 0,              -- Velocity Y (formerly 'velocity')
+    vy = 0,              -- Velocity Y
     gravity = 1000,      -- Gravity pulls the bird down
     sprites = {},        -- Stores loaded animation frames
     currentFrame = 1,
@@ -20,6 +19,11 @@ local bird = {
     angle = 0,            -- Rotation based on velocity
     jumpCount = 0         -- Track jumps between pipes
 }
+
+-- World Movement Properties
+local worldSpeed = 0
+local distanceTraveled = 0
+local nextPipeDist = 0
 
 -- Slingshot / Aiming Properties
 local aiming = {
@@ -37,14 +41,12 @@ local aiming = {
 local pipes = {}
 local pipeWidth = 80
 local pipeGap = 180      -- Vertical space between top and bottom pipes
-local pipeSpeed = 250    -- Speed at which pipes move left
-local spawnTimer = 0
-local spawnInterval = 1.8 -- Time in seconds between pipe spawns
+local pipeDistInterval = 400 -- Distance in pixels between pipes
 
 -- Background
 -- Parallax scrolling effect variables
 local backgroundScroll = 0
-local backgroundSpeed = 30 -- Parallax speed (slower than pipes to create depth)
+-- backgroundSpeed is now derived from worldSpeed
 
 -- Score
 -- Tracks player progress and persistence
@@ -102,7 +104,6 @@ end
 function resetGame()
     bird.x = 100
     bird.y = 300
-    bird.vx = 0
     bird.vy = 0
     bird.currentFrame = 1
     bird.animTimer = 0
@@ -111,20 +112,23 @@ function resetGame()
     bird.jumpCount = 0
     pipes = {}
     floatingTexts = {}
-    spawnTimer = 0
     score = 0
     gameState = states.START
     aiming.active = false
+    
+    worldSpeed = 0
+    distanceTraveled = 0
+    nextPipeDist = 400 -- First pipe distance
 end
 
 -- Creates a new pipe pair with random height
-function spawnPipe()
+function spawnPipe(xPos)
     local minHeight = 100
     local maxHeight = love.graphics.getHeight() - pipeGap - minHeight
     local topHeight = math.random(minHeight, maxHeight)
     
     table.insert(pipes, {
-        x = love.graphics.getWidth(),
+        x = xPos,
         top = topHeight,
         scored = false -- Track if the player has passed this pipe
     })
@@ -147,8 +151,9 @@ function love.update(dt)
     local timeScale = isAiming and 0.1 or 1.0
     local gameDt = dt * timeScale
 
-    -- Scroll background independently of game state for visual continuity
-    backgroundScroll = (backgroundScroll + backgroundSpeed * gameDt) % 80
+    -- Scroll background based on worldSpeed
+    -- Parallax factor of 0.1 for background
+    backgroundScroll = (backgroundScroll + worldSpeed * 0.1 * gameDt) % 80
 
     if gameState == states.PLAYING then
         -- Update Floating Texts
@@ -160,31 +165,30 @@ function love.update(dt)
             end
         end
 
-        -- Bird Physics
+        -- Bird Physics: Y Axis only
         bird.vy = bird.vy + bird.gravity * gameDt
         bird.y = bird.y + bird.vy * gameDt
-        bird.x = bird.x + bird.vx * gameDt
-
-        -- Friction/Drag on X velocity to gradually stop horizontal movement
+        
+        -- World Physics: Friction/Drag on World Speed
         local drag = 2.0 -- Friction coefficient
-        bird.vx = bird.vx - (bird.vx * drag * gameDt)
-
-        -- Clamp Bird to Screen Boundaries
-        if bird.x < bird.radius then bird.x = bird.radius; bird.vx = 0 end
-        if bird.x > love.graphics.getWidth() - bird.radius then bird.x = love.graphics.getWidth() - bird.radius; bird.vx = 0 end
+        worldSpeed = worldSpeed - (worldSpeed * drag * gameDt)
+        
+        -- Stop backward movement if it's very slow to prevent drift
+        if math.abs(worldSpeed) < 1 then worldSpeed = 0 end
 
         -- Rotation logic: Tilt up when jumping, down when falling
         bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.vy * 0.002))
 
         -- Animation Logic: Cycle through frames
-        if bird.isAnimating or math.abs(bird.vx) > 10 or math.abs(bird.vy) > 10 then
+        -- Animate if moving vertically OR if the world is moving fast enough
+        if bird.isAnimating or math.abs(worldSpeed) > 50 or math.abs(bird.vy) > 10 then
             bird.animTimer = bird.animTimer + gameDt
             if bird.animTimer >= bird.animSpeed then
                 bird.animTimer = 0
                 bird.currentFrame = bird.currentFrame + 1
                 if bird.currentFrame > #bird.sprites then
                     bird.currentFrame = 1
-                    bird.isAnimating = false -- Stop loop if strictly one-shot, but we probably want loop
+                    bird.isAnimating = false 
                 end
             end
         else
@@ -196,17 +200,25 @@ function love.update(dt)
             gameOver()
         end
 
-        -- Spawning Pipes
-        spawnTimer = spawnTimer + gameDt
-        if spawnTimer > spawnInterval then
-            spawnPipe()
-            spawnTimer = 0
+        -- Spawning Pipes Logic (Distance Based)
+        -- Accumulate distance. Note: worldSpeed is pixels/sec.
+        -- If worldSpeed is positive (moving forward), distance increases.
+        if worldSpeed > 0 then
+            distanceTraveled = distanceTraveled + worldSpeed * gameDt
+        end
+
+        if distanceTraveled > nextPipeDist then
+            spawnPipe(love.graphics.getWidth() + 50) -- Spawn just offscreen
+            nextPipeDist = nextPipeDist + pipeDistInterval
         end
 
         -- Pipes Update Loop
         for i = #pipes, 1, -1 do
             local p = pipes[i]
-            p.x = p.x - pipeSpeed * gameDt
+            
+            -- Move pipe based on worldSpeed relative to bird
+            -- If worldSpeed is positive (bird flying right), pipes move left.
+            p.x = p.x - worldSpeed * gameDt
 
             -- Collision Detection (AABB vs Circle approximation)
             -- Check horizontal overlap
@@ -220,7 +232,6 @@ function love.update(dt)
             -- Scoring: Increment score when passing a pipe
             if not p.scored and p.x + pipeWidth < bird.x then
                 local points = 1
-                -- Bonus for long jumps/fast moves could be added here
                 
                 score = score + points
                 p.scored = true
@@ -243,10 +254,12 @@ function love.update(dt)
                 end
             end
 
-            -- Cleanup: Remove pipes that have gone off-screen
-            if p.x + pipeWidth < 0 then
+            -- Cleanup: Remove pipes that have gone off-screen (left side)
+            if p.x + pipeWidth < -100 then
                 table.remove(pipes, i)
             end
+            -- Note: If we allow moving backward, we might want to cleanup off-screen right too?
+            -- keeping it simple for now.
         end
     end
 end
@@ -295,8 +308,12 @@ function love.mousereleased(x, y, button)
         end
         
         -- Apply Impulse
-        bird.vx = dx * aiming.powerMultiplier
+        -- Vertical impulse to Bird
         bird.vy = dy * aiming.powerMultiplier
+        
+        -- Horizontal impulse becomes World Speed
+        -- Positive dx (pulling back left -> aiming right) should result in Positive worldSpeed (Forward)
+        worldSpeed = dx * aiming.powerMultiplier
         
         sounds.jump:stop()
         sounds.jump:play()
