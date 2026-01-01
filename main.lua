@@ -308,8 +308,8 @@ function love.mousereleased(x, y, button)
         end
         
         -- Apply Impulse
-        -- Vertical impulse to Bird (Additive)
-        bird.vy = bird.vy + dy * aiming.powerMultiplier
+        -- Vertical impulse to Bird (Reset)
+        bird.vy = dy * aiming.powerMultiplier
         
         -- Horizontal impulse becomes World Speed (Additive)
         worldSpeed = worldSpeed + dx * aiming.powerMultiplier
