@@ -10,7 +10,7 @@ local bird = {
     y = 300,
     radius = 20,
     vy = 0,              -- Velocity Y
-    gravity = 600,      -- Gravity pulls the bird down
+    gravity = 400,      -- Gravity pulls the bird down
     sprites = {},        -- Stores loaded animation frames
     currentFrame = 1,
     animTimer = 0,
@@ -170,7 +170,7 @@ function love.update(dt)
         bird.y = bird.y + bird.vy * gameDt
         
         -- World Physics: Friction/Drag on World Speed
-        local drag = 0.8 -- Friction coefficient
+        local drag = 0.3 -- Friction coefficient
         worldSpeed = worldSpeed - (worldSpeed * drag * gameDt)
         
         -- Stop backward movement if it's very slow to prevent drift
@@ -390,7 +390,7 @@ function love.draw()
         local simWorldSpeed = worldSpeed + (dx * aiming.powerMultiplier)
         
         local simDt = 1/60 -- Fixed timestep for prediction
-        local drag = 0.8   -- Match the physics constant
+        local drag = 0.3   -- Match the physics constant
         local gravity = bird.gravity
         
         -- Draw trajectory points
