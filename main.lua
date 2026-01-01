@@ -51,6 +51,7 @@ local backgroundScroll = 0
 -- Score
 -- Tracks player progress and persistence
 local score = 0
+local pipesClearedInLaunch = 0
 local highscore = 0
 local highscoreFile = "highscore.txt"
 
@@ -113,6 +114,7 @@ function resetGame()
     pipes = {}
     floatingTexts = {}
     score = 0
+    pipesClearedInLaunch = 0
     gameState = states.START
     aiming.active = false
     
@@ -231,7 +233,8 @@ function love.update(dt)
 
             -- Scoring: Increment score when passing a pipe
             if not p.scored and p.x + pipeWidth < bird.x then
-                local points = 1
+                pipesClearedInLaunch = pipesClearedInLaunch + 1
+                local points = 1 * pipesClearedInLaunch
                 
                 score = score + points
                 p.scored = true
@@ -240,10 +243,15 @@ function love.update(dt)
                 sounds.score:play()
                 
                 -- Spawn floating text
+                local text = "+" .. points
+                if pipesClearedInLaunch > 1 then
+                    text = text .. " (x" .. pipesClearedInLaunch .. "!)"
+                end
+                
                 table.insert(floatingTexts, {
                     x = bird.x,
                     y = bird.y - 30,
-                    text = "+" .. points,
+                    text = text,
                     timer = 0,
                     duration = 0.8
                 })
@@ -313,6 +321,9 @@ function love.mousereleased(x, y, button)
         
         -- Horizontal impulse becomes World Speed (Additive)
         worldSpeed = worldSpeed + dx * aiming.powerMultiplier
+        
+        -- Reset Combo Counter on launch
+        pipesClearedInLaunch = 0
         
         sounds.jump:stop()
         sounds.jump:play()
