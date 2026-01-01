@@ -9,9 +9,9 @@ local bird = {
     x = 100,
     y = 300,
     radius = 20,
-    velocity = 0,
+    vx = 0,              -- Velocity X
+    vy = 0,              -- Velocity Y (formerly 'velocity')
     gravity = 1000,      -- Gravity pulls the bird down
-    jumpStrength = -400, -- Upward velocity applied on jump
     sprites = {},        -- Stores loaded animation frames
     currentFrame = 1,
     animTimer = 0,
@@ -19,6 +19,17 @@ local bird = {
     isAnimating = false,
     angle = 0,            -- Rotation based on velocity
     jumpCount = 0         -- Track jumps between pipes
+}
+
+-- Slingshot / Aiming Properties
+local aiming = {
+    active = false,
+    startX = 0,
+    startY = 0,
+    currentX = 0,
+    currentY = 0,
+    powerMultiplier = 3.0, -- Multiplier for launch force
+    maxPull = 200          -- Cap the pull distance
 }
 
 -- Pipe Properties
@@ -89,8 +100,10 @@ end
 
 -- Resets all game variables to their initial state for a new game
 function resetGame()
+    bird.x = 100
     bird.y = 300
-    bird.velocity = 0
+    bird.vx = 0
+    bird.vy = 0
     bird.currentFrame = 1
     bird.animTimer = 0
     bird.isAnimating = false
@@ -101,6 +114,7 @@ function resetGame()
     spawnTimer = 0
     score = 0
     gameState = states.START
+    aiming.active = false
 end
 
 -- Creates a new pipe pair with random height
@@ -126,35 +140,51 @@ function gameOver()
 end
 
 function love.update(dt)
+    -- Input handling for aiming
+    local isAiming = aiming.active
+    
+    -- Time Dilation: Slow down everything if aiming
+    local timeScale = isAiming and 0.1 or 1.0
+    local gameDt = dt * timeScale
+
     -- Scroll background independently of game state for visual continuity
-    backgroundScroll = (backgroundScroll + backgroundSpeed * dt) % 80 -- Modulo 80 (2 * cellSize) to keep numbers small
+    backgroundScroll = (backgroundScroll + backgroundSpeed * gameDt) % 80
 
     if gameState == states.PLAYING then
         -- Update Floating Texts
         for i = #floatingTexts, 1, -1 do
             local ft = floatingTexts[i]
-            ft.timer = ft.timer + dt
+            ft.timer = ft.timer + gameDt
             if ft.timer > ft.duration then
                 table.remove(floatingTexts, i)
             end
         end
 
-        -- Bird Physics: Apply gravity
-        bird.velocity = bird.velocity + bird.gravity * dt
-        bird.y = bird.y + bird.velocity * dt
+        -- Bird Physics
+        bird.vy = bird.vy + bird.gravity * gameDt
+        bird.y = bird.y + bird.vy * gameDt
+        bird.x = bird.x + bird.vx * gameDt
+
+        -- Friction/Drag on X velocity to gradually stop horizontal movement
+        local drag = 2.0 -- Friction coefficient
+        bird.vx = bird.vx - (bird.vx * drag * gameDt)
+
+        -- Clamp Bird to Screen Boundaries
+        if bird.x < bird.radius then bird.x = bird.radius; bird.vx = 0 end
+        if bird.x > love.graphics.getWidth() - bird.radius then bird.x = love.graphics.getWidth() - bird.radius; bird.vx = 0 end
 
         -- Rotation logic: Tilt up when jumping, down when falling
-        bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.velocity * 0.002))
+        bird.angle = math.min(math.pi / 2, math.max(-math.pi / 4, bird.vy * 0.002))
 
         -- Animation Logic: Cycle through frames
-        if bird.isAnimating then
-            bird.animTimer = bird.animTimer + dt
+        if bird.isAnimating or math.abs(bird.vx) > 10 or math.abs(bird.vy) > 10 then
+            bird.animTimer = bird.animTimer + gameDt
             if bird.animTimer >= bird.animSpeed then
                 bird.animTimer = 0
                 bird.currentFrame = bird.currentFrame + 1
                 if bird.currentFrame > #bird.sprites then
                     bird.currentFrame = 1
-                    bird.isAnimating = false
+                    bird.isAnimating = false -- Stop loop if strictly one-shot, but we probably want loop
                 end
             end
         else
@@ -167,7 +197,7 @@ function love.update(dt)
         end
 
         -- Spawning Pipes
-        spawnTimer = spawnTimer + dt
+        spawnTimer = spawnTimer + gameDt
         if spawnTimer > spawnInterval then
             spawnPipe()
             spawnTimer = 0
@@ -176,7 +206,7 @@ function love.update(dt)
         -- Pipes Update Loop
         for i = #pipes, 1, -1 do
             local p = pipes[i]
-            p.x = p.x - pipeSpeed * dt
+            p.x = p.x - pipeSpeed * gameDt
 
             -- Collision Detection (AABB vs Circle approximation)
             -- Check horizontal overlap
@@ -190,21 +220,13 @@ function love.update(dt)
             -- Scoring: Increment score when passing a pipe
             if not p.scored and p.x + pipeWidth < bird.x then
                 local points = 1
-                if bird.jumpCount == 1 then
-                    points = 3
-                elseif bird.jumpCount == 2 then
-                    points = 2
-                end
+                -- Bonus for long jumps/fast moves could be added here
                 
                 score = score + points
                 p.scored = true
-                bird.jumpCount = 0 -- Reset jump count for next pipe
                 
-                -- Play sound only if points >= 2
-                if points >= 2 then
-                    sounds.score:stop()
-                    sounds.score:play()
-                end
+                sounds.score:stop()
+                sounds.score:play()
                 
                 -- Spawn floating text
                 table.insert(floatingTexts, {
@@ -229,62 +251,86 @@ function love.update(dt)
     end
 end
 
+function love.mousepressed(x, y, button)
+    if button == 1 then
+        if gameState == states.GAMEOVER then
+            resetGame()
+        else
+            -- Start aiming
+            aiming.active = true
+            aiming.startX = x
+            aiming.startY = y
+            aiming.currentX = x
+            aiming.currentY = y
+            
+            -- If first start
+            if gameState == states.START then
+                gameState = states.PLAYING
+            end
+        end
+    end
+end
+
+function love.mousemoved(x, y)
+    if aiming.active then
+        aiming.currentX = x
+        aiming.currentY = y
+    end
+end
+
+function love.mousereleased(x, y, button)
+    if button == 1 and aiming.active then
+        aiming.active = false
+        
+        -- Calculate vector (Start - End) for "Pull back" mechanic
+        local dx = aiming.startX - x
+        local dy = aiming.startY - y
+        
+        -- Cap the magnitude
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len > aiming.maxPull then
+            local scale = aiming.maxPull / len
+            dx = dx * scale
+            dy = dy * scale
+        end
+        
+        -- Apply Impulse
+        bird.vx = dx * aiming.powerMultiplier
+        bird.vy = dy * aiming.powerMultiplier
+        
+        sounds.jump:stop()
+        sounds.jump:play()
+        bird.isAnimating = true
+    end
+end
+
 function love.keypressed(key)
     -- Global input handling
     if key == "escape" then
         love.event.quit()
     end
-
-    if key == "space" then
-        if gameState == states.START then
-            gameState = states.PLAYING
-            bird.isAnimating = true
-            bird.jumpCount = 1
-            bird.velocity = bird.jumpStrength
-            sounds.jump:play()
-        elseif gameState == states.PLAYING then
-            -- Jump action
-            bird.velocity = bird.jumpStrength
-            bird.isAnimating = true
-            bird.currentFrame = 1
-            bird.animTimer = 0
-            bird.jumpCount = bird.jumpCount + 1
-            sounds.jump:stop()
-            sounds.jump:play()
-        elseif gameState == states.GAMEOVER then
-            resetGame()
-        end
-    end
+    -- Removed SPACE jump to enforce slingshot only
 end
 
 function love.draw()
     -- Draw Checkerboard Background
-    -- Renders a grid pattern that scrolls to simulate movement
     local cellSize = 40
-    -- We draw a bit wider than the screen to handle the scrolling shift
     for y = 0, love.graphics.getHeight(), cellSize do
         for x = -cellSize * 2, love.graphics.getWidth() + cellSize, cellSize do
-            -- Determine color based on the logical grid position
             if (math.floor(x / cellSize) + math.floor(y / cellSize)) % 2 == 0 then
-                love.graphics.setColor(0.96, 0.96, 0.86) -- Beige 1
+                love.graphics.setColor(0.96, 0.96, 0.86)
             else
-                love.graphics.setColor(0.93, 0.91, 0.82) -- Beige 2
+                love.graphics.setColor(0.93, 0.91, 0.82)
             end
-            
-            -- Draw at the scrolled position
-            -- We subtract backgroundScroll to move left
-            -- backgroundScroll is already modulo'd in update, but we rely on the loop's 'x' being aligned to grid
             love.graphics.rectangle("fill", x - backgroundScroll, y, cellSize, cellSize)
         end
     end
 
     -- Draw Pipes
     for _, p in ipairs(pipes) do
-        love.graphics.setColor(0.2, 0.8, 0.2) -- Green
-        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top) -- Top pipe body
-        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap)) -- Bottom pipe body
-        
-        -- Draw outlines for better visibility
+        love.graphics.setColor(0.2, 0.8, 0.2)
+        love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
+        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
         love.graphics.setColor(0, 0, 0)
         love.graphics.setLineWidth(3)
         love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
@@ -294,39 +340,57 @@ function love.draw()
     -- Draw Bird
     love.graphics.setColor(1, 1, 1)
     local sprite = bird.sprites[bird.currentFrame]
-    -- Calculate scale to fit the sprite into the collision radius
     local bScaleX = (bird.radius * 2) / sprite:getWidth()
     local bScaleY = (bird.radius * 2) / sprite:getHeight()
-    -- Draw centered on position with rotation
     love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
+
+    -- Draw Slingshot Visualization
+    if aiming.active then
+        -- Calculate clamped end point
+        local dx = aiming.currentX - aiming.startX
+        local dy = aiming.currentY - aiming.startY
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len > aiming.maxPull then
+            local scale = aiming.maxPull / len
+            dx = dx * scale
+            dy = dy * scale
+        end
+        
+        -- Draw line from Bird in the direction of the launch (Opposite to drag)
+        -- Visual 1: Draw the "String" being pulled
+        love.graphics.setColor(0, 0, 0, 0.5)
+        love.graphics.setLineWidth(4)
+        love.graphics.line(bird.x, bird.y, bird.x + dx, bird.y + dy)
+        
+        -- Visual 2: Draw the projected launch direction (optional, but helpful)
+        love.graphics.setColor(1, 0, 0, 0.5)
+        love.graphics.setLineWidth(2)
+        love.graphics.line(bird.x, bird.y, bird.x - dx, bird.y - dy)
+        
+        -- Draw circle at end of pull
+        love.graphics.setColor(0, 0, 0, 0.5)
+        love.graphics.circle("fill", bird.x + dx, bird.y + dy, 10)
+    end
 
     -- Draw Floating Texts
     for _, ft in ipairs(floatingTexts) do
         local progress = ft.timer / ft.duration
-        local scale = math.sin(progress * math.pi) * 2 -- Enlarge and shrink (0 -> 2 -> 0)
-        local alpha = 1 - progress -- Fade out linearly
+        local scale = math.sin(progress * math.pi) * 2
+        local alpha = 1 - progress
         
-        love.graphics.setColor(0, 0, 0, alpha) -- Shadow
+        love.graphics.setColor(0, 0, 0, alpha)
         love.graphics.print(ft.text, ft.x + 2, ft.y + 2, 0, scale, scale, 10, 10)
-        
-        if ft.text == "+3" then
-            love.graphics.setColor(1, 0.8, 0, alpha) -- Gold for max points
-        elseif ft.text == "+2" then
-            love.graphics.setColor(0.8, 0.8, 0.8, alpha) -- Silver/Grey for mid points
-        else
-            love.graphics.setColor(1, 1, 1, alpha) -- White for standard
-        end
+        love.graphics.setColor(1, 1, 1, alpha)
         love.graphics.print(ft.text, ft.x, ft.y, 0, scale, scale, 10, 10)
     end
 
     -- UI
     love.graphics.setColor(0, 0, 0)
     if gameState == states.START then
-        love.graphics.printf("Press SPACE to Start\nHighscore: " .. highscore, 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
+        love.graphics.printf("Click and Drag to Launch!\nHighscore: " .. highscore, 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
     elseif gameState == states.GAMEOVER then
-        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nHighscore: " .. highscore .. "\nPress SPACE to Restart", 0, love.graphics.getHeight()/2 - 40, love.graphics.getWidth(), "center")
+        love.graphics.printf("GAME OVER\nScore: " .. score .. "\nHighscore: " .. highscore .. "\nClick to Restart", 0, love.graphics.getHeight()/2 - 40, love.graphics.getWidth(), "center")
     else
-        -- HUD during gameplay
         love.graphics.setFont(love.graphics.newFont(24))
         love.graphics.print("Score: " .. score, 20, 20)
         love.graphics.print("Best: " .. highscore, 20, 50)
