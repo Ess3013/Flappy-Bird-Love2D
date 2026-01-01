@@ -41,6 +41,9 @@ local score = 0
 local highscore = 0
 local highscoreFile = "highscore.txt"
 
+-- Floating Text for Score Feedback
+local floatingTexts = {}
+
 -- Audio
 local sounds = {}
 
@@ -94,6 +97,7 @@ function resetGame()
     bird.angle = 0
     bird.jumpCount = 0
     pipes = {}
+    floatingTexts = {}
     spawnTimer = 0
     score = 0
     gameState = states.START
@@ -126,6 +130,15 @@ function love.update(dt)
     backgroundScroll = (backgroundScroll + backgroundSpeed * dt) % 80 -- Modulo 80 (2 * cellSize) to keep numbers small
 
     if gameState == states.PLAYING then
+        -- Update Floating Texts
+        for i = #floatingTexts, 1, -1 do
+            local ft = floatingTexts[i]
+            ft.timer = ft.timer + dt
+            if ft.timer > ft.duration then
+                table.remove(floatingTexts, i)
+            end
+        end
+
         -- Bird Physics: Apply gravity
         bird.velocity = bird.velocity + bird.gravity * dt
         bird.y = bird.y + bird.velocity * dt
@@ -186,8 +199,21 @@ function love.update(dt)
                 score = score + points
                 p.scored = true
                 bird.jumpCount = 0 -- Reset jump count for next pipe
-                sounds.score:stop()
-                sounds.score:play()
+                
+                -- Play sound only if points >= 2
+                if points >= 2 then
+                    sounds.score:stop()
+                    sounds.score:play()
+                end
+                
+                -- Spawn floating text
+                table.insert(floatingTexts, {
+                    x = bird.x,
+                    y = bird.y - 30,
+                    text = "+" .. points,
+                    timer = 0,
+                    duration = 0.8
+                })
                 
                 -- Update highscore live for player feedback
                 if score > highscore then
@@ -273,6 +299,25 @@ function love.draw()
     local bScaleY = (bird.radius * 2) / sprite:getHeight()
     -- Draw centered on position with rotation
     love.graphics.draw(sprite, bird.x, bird.y, bird.angle, bScaleX, bScaleY, sprite:getWidth()/2, sprite:getHeight()/2)
+
+    -- Draw Floating Texts
+    for _, ft in ipairs(floatingTexts) do
+        local progress = ft.timer / ft.duration
+        local scale = math.sin(progress * math.pi) * 2 -- Enlarge and shrink (0 -> 2 -> 0)
+        local alpha = 1 - progress -- Fade out linearly
+        
+        love.graphics.setColor(0, 0, 0, alpha) -- Shadow
+        love.graphics.print(ft.text, ft.x + 2, ft.y + 2, 0, scale, scale, 10, 10)
+        
+        if ft.text == "+3" then
+            love.graphics.setColor(1, 0.8, 0, alpha) -- Gold for max points
+        elseif ft.text == "+2" then
+            love.graphics.setColor(0.8, 0.8, 0.8, alpha) -- Silver/Grey for mid points
+        else
+            love.graphics.setColor(1, 1, 1, alpha) -- White for standard
+        end
+        love.graphics.print(ft.text, ft.x, ft.y, 0, scale, scale, 10, 10)
+    end
 
     -- UI
     love.graphics.setColor(0, 0, 0)
