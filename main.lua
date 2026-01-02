@@ -1,7 +1,13 @@
 -- Game States
 -- Simple state machine to manage game flow between Start, Playing, and Game Over screens.
-local states = { START = "start", PLAYING = "playing", GAMEOVER = "gameover" }
-local gameState = states.START
+local states = { MENU = "menu", START = "start", PLAYING = "playing", GAMEOVER = "gameover" }
+local gameState = states.MENU
+
+-- Main Menu Properties
+local menuTitleTimer = 0
+local startButton = {
+    x = 0, y = 0, width = 200, height = 60, text = "Start Game"
+}
 
 -- Bird Properties
 -- Defines the player character's physics, position, and animation state.
@@ -105,7 +111,7 @@ function love.load()
     -- 'stream' is for longer music files streamed from disk.
     sounds.jump = love.audio.newSource("Audio/sfx_movement_ladder1b.wav", "static")
     sounds.score = love.audio.newSource("Audio/sfx_sounds_powerup6.wav", "static")
-    sounds.music = love.audio.newSource("Audio/BGM.wav", "stream")
+    sounds.music = love.audio.newSource("Audio/BGMNew.wav", "stream")
     
     -- Configure and play background music
     sounds.music:setLooping(true)
@@ -114,6 +120,7 @@ function love.load()
     -- Initialize game state
     loadHighscore()
     resetGame()
+    gameState = states.MENU -- Force menu on startup
 end
 
 -- Resets all game variables to their initial state for a new game session.
@@ -184,6 +191,13 @@ function love.update(dt)
     -- Update Background Parallax
     -- Scroll background based on worldSpeed with a factor (0.1) for depth effect.
     backgroundScroll = (backgroundScroll + worldSpeed * 0.1 * gameDt) % 80
+
+    if gameState == states.MENU then
+        menuTitleTimer = menuTitleTimer + dt
+        -- Center button
+        startButton.x = love.graphics.getWidth() / 2 - startButton.width / 2
+        startButton.y = love.graphics.getHeight() / 2 + 50
+    end
 
     -- Main Gameplay Loop
     if gameState == states.PLAYING then
@@ -328,7 +342,13 @@ end
 -- Handles initiating the drag/aiming action.
 function love.mousepressed(x, y, button)
     if button == 1 then -- Left mouse button
-        if gameState == states.GAMEOVER then
+        if gameState == states.MENU then
+            -- Check collision with Start Button
+            if x >= startButton.x and x <= startButton.x + startButton.width and
+               y >= startButton.y and y <= startButton.y + startButton.height then
+               gameState = states.START
+            end
+        elseif gameState == states.GAMEOVER then
             resetGame() -- Restart game on click if game over
         else
             -- Start aiming mechanics
@@ -524,7 +544,39 @@ function love.draw()
 
     -- Draw User Interface (UI)
     love.graphics.setColor(0, 0, 0)
-    if gameState == states.START then
+    if gameState == states.MENU then
+        -- Draw Waving Title
+        local title = "Angry Flappy Bird"
+        local font = love.graphics.newFont(40)
+        love.graphics.setFont(font)
+        love.graphics.setColor(0.4, 0.7, 1) -- Light Blue
+        
+        local titleW = font:getWidth(title)
+        local startX = love.graphics.getWidth() / 2 - titleW / 2
+        local startY = love.graphics.getHeight() / 2 - 100
+        
+        -- Draw each character with a sine wave offset
+        for i = 1, #title do
+            local char = string.sub(title, i, i)
+            local offset = math.sin(menuTitleTimer * 5 + i * 0.5) * 10
+            love.graphics.print(char, startX + font:getWidth(string.sub(title, 1, i-1)), startY + offset)
+        end
+        
+        -- Draw Start Button
+        love.graphics.setColor(1, 1, 1) -- White background
+        love.graphics.rectangle("fill", startButton.x, startButton.y, startButton.width, startButton.height, 10, 10)
+        love.graphics.setColor(0, 0, 0) -- Black outline
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", startButton.x, startButton.y, startButton.width, startButton.height, 10, 10)
+        
+        -- Button Text
+        local btnFont = love.graphics.newFont(24)
+        love.graphics.setFont(btnFont)
+        local textW = btnFont:getWidth(startButton.text)
+        local textH = btnFont:getHeight()
+        love.graphics.print(startButton.text, startButton.x + startButton.width/2 - textW/2, startButton.y + startButton.height/2 - textH/2)
+        
+    elseif gameState == states.START then
         love.graphics.printf("Click and Drag to Launch!\nHighscore: " .. highscore, 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
     elseif gameState == states.GAMEOVER then
         love.graphics.printf("GAME OVER\nScore: " .. score .. "\nHighscore: " .. highscore .. "\nClick to Restart", 0, love.graphics.getHeight()/2 - 40, love.graphics.getWidth(), "center")
