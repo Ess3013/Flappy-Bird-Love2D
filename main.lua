@@ -5,9 +5,8 @@ local gameState = states.MENU
 
 -- Main Menu Properties
 local menuTitleTimer = 0
-local startButton = {
-    x = 0, y = 0, width = 200, height = 60, text = "Start Game"
-}
+local titleOffset = 0
+local isTransitioning = false
 
 -- Bird Properties
 -- Defines the player character's physics, position, and animation state.
@@ -121,6 +120,9 @@ function love.load()
     loadHighscore()
     resetGame()
     gameState = states.MENU -- Force menu on startup
+    -- Override bird position for menu
+    bird.x = love.graphics.getWidth() / 2
+    bird.y = love.graphics.getHeight() / 2
 end
 
 -- Resets all game variables to their initial state for a new game session.
@@ -143,6 +145,10 @@ function resetGame()
     timeLeft = 30 -- Time Attack: Start with 30 seconds
     gameState = states.START
     aiming.active = false
+    
+    -- Menu specific
+    titleOffset = 0
+    isTransitioning = false
     
     -- Reset Physics/World
     worldSpeed = 0
@@ -194,9 +200,22 @@ function love.update(dt)
 
     if gameState == states.MENU then
         menuTitleTimer = menuTitleTimer + dt
-        -- Center button
-        startButton.x = love.graphics.getWidth() / 2 - startButton.width / 2
-        startButton.y = love.graphics.getHeight() / 2 + 50
+    end
+    
+    -- Transition Logic (Menu -> Playing)
+    if isTransitioning then
+        -- Smoothly move Title to the left
+        titleOffset = titleOffset + 1000 * dt
+        
+        -- Smoothly move Bird to normal X position (100)
+        -- Lerp formula: a = a + (b - a) * speed * dt
+        bird.x = bird.x + (100 - bird.x) * 5 * dt
+        
+        -- Snap to target if close enough
+        if math.abs(bird.x - 100) < 1 then
+            bird.x = 100
+            isTransitioning = false
+        end
     end
 
     -- Main Gameplay Loop
@@ -342,24 +361,17 @@ end
 -- Handles initiating the drag/aiming action.
 function love.mousepressed(x, y, button)
     if button == 1 then -- Left mouse button
-        if gameState == states.MENU then
-            -- Check collision with Start Button
-            if x >= startButton.x and x <= startButton.x + startButton.width and
-               y >= startButton.y and y <= startButton.y + startButton.height then
-               gameState = states.START
-               sounds.music:stop() -- Stop music when leaving menu
-            end
-        elseif gameState == states.GAMEOVER then
+        if gameState == states.GAMEOVER then
             resetGame() -- Restart game on click if game over
         else
-            -- Start aiming mechanics
+            -- Start aiming mechanics (Available in MENU, START, and PLAYING)
             aiming.active = true
             aiming.startX = x
             aiming.startY = y
             aiming.currentX = x
             aiming.currentY = y
             
-            -- Transition from Start screen to Playing state on first interaction
+            -- If in START state, transition to PLAYING immediately on click (legacy logic, strictly speaking not needed if drag-to-start is primary)
             if gameState == states.START then
                 gameState = states.PLAYING
             end
@@ -381,6 +393,13 @@ end
 function love.mousereleased(x, y, button)
     if button == 1 and aiming.active then
         aiming.active = false
+        
+        -- Handle Menu Launch
+        if gameState == states.MENU then
+            gameState = states.PLAYING
+            isTransitioning = true
+            sounds.music:stop()
+        end
         
         -- Calculate vector (Start - End) for "Pull back" mechanic
         -- Dragging left -> launches right. Dragging down -> launches up.
@@ -545,16 +564,16 @@ function love.draw()
 
     -- Draw User Interface (UI)
     love.graphics.setColor(0, 0, 0)
-    if gameState == states.MENU then
+    if gameState == states.MENU or isTransitioning then
         -- Draw Waving Title
         local title = "Angry Flappy Bird"
-        local font = love.graphics.newFont(40)
+        local font = love.graphics.newFont(60) -- Larger Font
         love.graphics.setFont(font)
         love.graphics.setColor(0.4, 0.7, 1) -- Light Blue
         
         local titleW = font:getWidth(title)
-        local startX = love.graphics.getWidth() / 2 - titleW / 2
-        local startY = love.graphics.getHeight() / 2 - 100
+        local startX = (love.graphics.getWidth() / 2 - titleW / 2) - titleOffset
+        local startY = love.graphics.getHeight() / 2 - 150
         
         -- Draw each character with a sine wave offset
         for i = 1, #title do
@@ -563,19 +582,12 @@ function love.draw()
             love.graphics.print(char, startX + font:getWidth(string.sub(title, 1, i-1)), startY + offset)
         end
         
-        -- Draw Start Button
-        love.graphics.setColor(1, 1, 1) -- White background
-        love.graphics.rectangle("fill", startButton.x, startButton.y, startButton.width, startButton.height, 10, 10)
-        love.graphics.setColor(0, 0, 0) -- Black outline
-        love.graphics.setLineWidth(3)
-        love.graphics.rectangle("line", startButton.x, startButton.y, startButton.width, startButton.height, 10, 10)
-        
-        -- Button Text
-        local btnFont = love.graphics.newFont(24)
-        love.graphics.setFont(btnFont)
-        local textW = btnFont:getWidth(startButton.text)
-        local textH = btnFont:getHeight()
-        love.graphics.print(startButton.text, startButton.x + startButton.width/2 - textW/2, startButton.y + startButton.height/2 - textH/2)
+        -- Draw Instruction Text (Fade out during transition)
+        if not isTransitioning then
+            love.graphics.setColor(0, 0, 0, 0.5)
+            love.graphics.setFont(love.graphics.newFont(20))
+            love.graphics.printf("Drag the Bird to Start!", 0, love.graphics.getHeight()/2 + 60, love.graphics.getWidth(), "center")
+        end
         
     elseif gameState == states.START then
         love.graphics.printf("Click and Drag to Launch!\nHighscore: " .. highscore, 0, love.graphics.getHeight()/2 - 20, love.graphics.getWidth(), "center")
