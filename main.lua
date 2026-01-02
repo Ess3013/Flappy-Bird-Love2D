@@ -347,6 +347,7 @@ function love.mousepressed(x, y, button)
             if x >= startButton.x and x <= startButton.x + startButton.width and
                y >= startButton.y and y <= startButton.y + startButton.height then
                gameState = states.START
+               sounds.music:stop() -- Stop music when leaving menu
             end
         elseif gameState == states.GAMEOVER then
             resetGame() -- Restart game on click if game over
