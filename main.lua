@@ -350,6 +350,9 @@ function love.mousereleased(x, y, button)
         -- Dragging left -> launches right. Dragging down -> launches up.
         local dx = aiming.startX - x
         local dy = aiming.startY - y
+
+        -- Clamp to forward direction only (can't launch backward)
+        if dx < 0 then dx = 0 end
         
         -- Clamp the launch vector magnitude to maxPull
         local len = math.sqrt(dx*dx + dy*dy)
@@ -435,6 +438,10 @@ function love.draw()
         -- Calculate clamped vector (duplicated logic from mousereleased for visual accuracy)
         local dx = aiming.startX - aiming.currentX
         local dy = aiming.startY - aiming.currentY
+
+        -- Clamp to forward direction only
+        if dx < 0 then dx = 0 end
+
         local len = math.sqrt(dx*dx + dy*dy)
         if len > aiming.maxPull then
             local scale = aiming.maxPull / len
