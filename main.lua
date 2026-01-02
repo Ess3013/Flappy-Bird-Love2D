@@ -54,6 +54,7 @@ local backgroundScroll = 0 -- Current scroll offset for the background pattern
 -- Score
 -- Tracks player progress and persistence.
 local score = 0                   -- Current game score
+local timeLeft = 0                -- Time Attack: Remaining time
 local pipesClearedInLaunch = 0    -- Combo counter: pipes cleared in a single launch
 local highscore = 0               -- Highest score achieved
 local highscoreFile = "highscore.txt" -- File path for persistence
@@ -131,6 +132,7 @@ function resetGame()
     floatingTexts = {}
     score = 0
     pipesClearedInLaunch = 0
+    timeLeft = 30 -- Time Attack: Start with 30 seconds
     gameState = states.START
     aiming.active = false
     
@@ -184,6 +186,14 @@ function love.update(dt)
 
     -- Main Gameplay Loop
     if gameState == states.PLAYING then
+        -- Update Time Attack Timer
+        -- Decrease by real delta time (dt) to penalize excessive slow-motion aiming
+        timeLeft = timeLeft - dt
+        if timeLeft <= 0 then
+            timeLeft = 0
+            gameOver()
+        end
+
         -- Update Floating Score Texts
         -- Iterate backwards to allow safe removal of items
         for i = #floatingTexts, 1, -1 do
@@ -276,12 +286,16 @@ function love.update(dt)
                 score = score + points
                 p.scored = true
                 
+                -- Time Attack Bonus
+                local timeBonus = 2 * pipesClearedInLaunch -- Bonus time scales with combo
+                timeLeft = timeLeft + timeBonus
+                
                 -- Play score sound (interrupt previous if playing for rapid scoring)
                 sounds.score:stop()
                 sounds.score:play()
                 
                 -- Generate floating feedback text
-                local text = "+" .. points
+                local text = "+" .. points .. " (+" .. timeBonus .. "s)"
                 if pipesClearedInLaunch > 1 then
                     text = text .. " (x" .. pipesClearedInLaunch .. "!)"
                 end
@@ -518,5 +532,10 @@ function love.draw()
         love.graphics.setFont(love.graphics.newFont(24))
         love.graphics.print("Score: " .. score, 20, 20)
         love.graphics.print("Best: " .. highscore, 20, 50)
+        
+        -- Draw Timer
+        if timeLeft < 5 then love.graphics.setColor(1, 0, 0) end -- Warning color
+        love.graphics.print("Time: " .. string.format("%.1f", timeLeft), 20, 80)
+        love.graphics.setColor(1, 1, 1)
     end
 end
