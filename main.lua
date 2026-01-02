@@ -55,6 +55,7 @@ local backgroundScroll = 0 -- Current scroll offset for the background pattern
 -- Tracks player progress and persistence.
 local score = 0                   -- Current game score
 local timeLeft = 0                -- Time Attack: Remaining time
+local timePerPipe = 1           -- Time bonus per pipe cleared
 local pipesClearedInLaunch = 0    -- Combo counter: pipes cleared in a single launch
 local highscore = 0               -- Highest score achieved
 local highscoreFile = "highscore.txt" -- File path for persistence
@@ -287,7 +288,7 @@ function love.update(dt)
                 p.scored = true
                 
                 -- Time Attack Bonus
-                local timeBonus = 2 * pipesClearedInLaunch -- Bonus time scales with combo
+                local timeBonus = timePerPipe * pipesClearedInLaunch -- Bonus time scales with combo
                 timeLeft = timeLeft + timeBonus
                 
                 -- Play score sound (interrupt previous if playing for rapid scoring)
