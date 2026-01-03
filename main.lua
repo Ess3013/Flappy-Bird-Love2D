@@ -69,13 +69,6 @@ local highscoreFile = "highscore.txt" -- File path for persistence
 -- Stores temporary text objects for visual effects (e.g., "+1 Score").
 local floatingTexts = {}
 
--- Camera Properties
--- Controls the zoom level of the game world based on speed.
-local camera = {
-    scale = 1.0,
-    zoomSpeed = 2.0 -- How fast the camera adjusts to speed changes
-}
-
 -- Audio
 -- Table to store loaded sound sources.
 local sounds = {}
@@ -161,9 +154,6 @@ function resetGame()
     worldSpeed = 0
     distanceTraveled = 0
     nextPipeDist = 400 -- Set distance for the first pipe
-    
-    -- Reset Camera
-    camera.scale = 1.0
 end
 
 -- Creates a new pipe pair with a random vertical offset.
@@ -207,20 +197,6 @@ function love.update(dt)
     -- Update Background Parallax
     -- Scroll background based on worldSpeed with a factor (0.1) for depth effect.
     backgroundScroll = (backgroundScroll + worldSpeed * 0.1 * gameDt) % 80
-
-    -- Update Camera Zoom
-    -- Calculate current speed (magnitude of velocity)
-    -- We combine vertical velocity (bird.vy) and horizontal world movement (worldSpeed)
-    local speed = math.sqrt(bird.vy^2 + worldSpeed^2)
-    
-    -- Target Scale Calculation
-    -- Max speed reference: ~1000 pixels/sec. Min scale: 0.6.
-    local minScale = 0.6
-    local maxSpeedRef = 1000
-    local targetScale = 1.0 - math.min(speed / maxSpeedRef, 1.0) * (1.0 - minScale)
-    
-    -- Smoothly interpolate current scale towards target
-    camera.scale = camera.scale + (targetScale - camera.scale) * dt * camera.zoomSpeed
 
     if gameState == states.MENU then
         menuTitleTimer = menuTitleTimer + dt
@@ -471,34 +447,12 @@ end
 -- LÖVE Draw Callback
 -- Renders the game state to the screen.
 function love.draw()
-    local w, h = love.graphics.getDimensions()
-
-    -- Start Camera Transform
-    love.graphics.push()
-    love.graphics.translate(w/2, h/2)
-    love.graphics.scale(camera.scale)
-    love.graphics.translate(-w/2, -h/2)
-
     -- Draw Checkerboard Background
     -- Creates a scrolling infinite background effect
-    -- Calculate visible bounds based on zoom to ensure screen is filled
     local cellSize = 40
-    local s = camera.scale
-    -- Calculate world coordinates of the screen edges
-    local minX = w/2 * (1 - 1/s)
-    local minY = h/2 * (1 - 1/s)
-    local maxX = w/2 * (1 + 1/s)
-    local maxY = h/2 * (1 + 1/s)
-    
-    -- Round to cell size and add buffer
-    local startX = math.floor((minX - cellSize * 2) / cellSize) * cellSize
-    local startY = math.floor((minY - cellSize) / cellSize) * cellSize
-    local endX = maxX + cellSize
-    local endY = maxY + cellSize
-
-    for y = startY, endY, cellSize do
+    for y = 0, love.graphics.getHeight(), cellSize do
         -- Draw extra columns to cover the scrolling offset
-        for x = startX, endX, cellSize do
+        for x = -cellSize * 2, love.graphics.getWidth() + cellSize, cellSize do
             if (math.floor(x / cellSize) + math.floor(y / cellSize)) % 2 == 0 then
                 love.graphics.setColor(0.96, 0.96, 0.86)
             else
@@ -510,19 +464,18 @@ function love.draw()
     end
 
     -- Draw Pipes
-    local worldBottom = h / s + 200 -- Extend pipes below visible area
     for _, p in ipairs(pipes) do
         love.graphics.setColor(0.2, 0.8, 0.2) -- Green color
         -- Top pipe
         love.graphics.rectangle("fill", p.x, 0, pipeWidth, p.top)
         -- Bottom pipe
-        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, worldBottom - (p.top + pipeGap))
+        love.graphics.rectangle("fill", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
         
         -- Pipe outlines
         love.graphics.setColor(0, 0, 0)
         love.graphics.setLineWidth(3)
         love.graphics.rectangle("line", p.x, 0, pipeWidth, p.top)
-        love.graphics.rectangle("line", p.x, p.top + pipeGap, pipeWidth, worldBottom - (p.top + pipeGap))
+        love.graphics.rectangle("line", p.x, p.top + pipeGap, pipeWidth, love.graphics.getHeight() - (p.top + pipeGap))
     end
 
     -- Draw Bird
@@ -569,7 +522,6 @@ function love.draw()
         local simDt = 1/60 -- Fixed timestep for stable prediction
         local drag = 0.3   -- Must match physics constant
         local gravity = bird.gravity
-        local simBottom = h / s + 200 -- Simulation bounds
         
         -- Simulate physics steps into the future
         for i = 1, 90 do -- Simulate ~1.5 seconds (90 frames at 60fps)
@@ -589,7 +541,7 @@ function love.draw()
             end
             
             -- Stop drawing if prediction goes off-screen
-            if simY > simBottom or simY < -200 or simX > w / s + 200 then
+            if simY > love.graphics.getHeight() or simY < 0 or simX > love.graphics.getWidth() then
                 break
             end
         end
@@ -609,9 +561,6 @@ function love.draw()
         love.graphics.setColor(1, 1, 1, alpha)
         love.graphics.print(ft.text, ft.x, ft.y, 0, scale, scale, 10, 10)
     end
-
-    -- End Camera Transform
-    love.graphics.pop()
 
     -- Draw User Interface (UI)
     love.graphics.setColor(0, 0, 0)
